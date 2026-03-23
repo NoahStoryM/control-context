@@ -109,10 +109,10 @@ Is the Law of Excluded Middle.
 (define (mul . r*)
   (define result (cc))
   (when (continuation? result)
-    (for/fold ([res (*)] #:result (result res))
+    (for/fold ([res (*)] #:result (cc result res))
               ([r (in-list r*)])
       (if (zero? r)
-          (result r)
+          (cc result r)
           (* res r))))
   result)
 ]
