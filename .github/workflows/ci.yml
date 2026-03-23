@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: bogdanp/setup-racket@v1.14
+        with:
+          version: "stable"
+      - name: Install packages
+        run: raco pkg install --auto
+      - name: Run tests
+        run: raco test -p control-context
