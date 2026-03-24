@@ -48,7 +48,10 @@ which are simpler, more direct alternatives to @racket[call/cc].
 (define current-continuation
   (case-λ
     [() (current-continuation (default-continuation-prompt-tag))]
-    [(p) (if (continuation-prompt-tag? p) (call/cc values p) (p))]
+    [(p)
+     (if (continuation-prompt-tag? p)
+         (call-with-current-continuation values p)
+         (p))]
     [(k . v*) (apply k v*)]))
 ]
 
