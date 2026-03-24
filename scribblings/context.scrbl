@@ -4,7 +4,7 @@
                      racket/contract/base
                      racket/function
                      racket/sequence
-                     (only-in typed/racket/base define-type → Nothing)
+                     (only-in typed/racket/base : ∀ ∪ → Nothing define-type)
                      data/queue
                      control/context)
           "utils.rkt")
@@ -15,26 +15,56 @@
 
 @section{Overview}
 
-This package provides @racket[goto], @racket[label] and @racket[cc],
+This package provides @racket[label], @racket[goto], and @racket[cc]
+(short for @racket[current-continuation]),
 which are simpler, more direct alternatives to @racket[call/cc].
+
+The key idea is that continuations can be understood through three
+equivalent lenses, each with different trade-offs:
+
+@itemlist[
+  @item{@bold{First-class labels} (@racket[label] + @racket[goto])
+  —
+  conceptually the simplest, with a trivial type (@racket[Label]),
+  but requires mutation (@racket[set!]) to communicate across jumps.}
+
+  @item{@bold{Law of Excluded Middle + Law of Noncontradiction} (@racket[cc])
+  —
+  eliminates the need for mutation by returning a union type
+  @racket[(LEM a)] = @racket[a] ∪ @racket[(¬ a)], at the cost of
+  branching on whether you received a value or a continuation.}
+
+  @item{@bold{Peirce's law} (@racket[call/cc])
+  —
+  eliminates both mutation and union types by delivering
+  the continuation as an argument to a callback, at the cost of
+  a more complex higher-order type signature.}
+]
+
+All three are equivalent in expressive power. This package provides
+the first two as building blocks, and shows how @racket[call/cc] can
+be defined in terms of them (and vice versa).
 
 @section{API Reference}
 
-@defproc[(goto [k (-> any/c none/c)] [v any/c k]) none/c]{
-@racketblock[
-(define (goto k [v k]) (k v))
-]
-
-@racketblock[
-(define (goto k [v k]) (cc k v))
-]
-}
-
 @defproc[(label [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]{
+
+Captures the current position in the program and returns
+a @racket[Label] value. A subsequent @racket[(goto l)] jumps back to
+this point, causing @racket[label] to "return again".
+
+The optional @racket[prompt-tag] argument specifies which continuation
+prompt to capture up to, defaulting to
+@racket[(default-continuation-prompt-tag)].
+
+Implementation using @racket[call/cc]:
+
 @racketblock[
 (define (label [prompt-tag (default-continuation-prompt-tag)])
   (call/cc goto prompt-tag))
 ]
+
+Implementation using @racket[cc]:
 
 @racketblock[
 (define (label [prompt-tag (default-continuation-prompt-tag)])
@@ -42,8 +72,51 @@ which are simpler, more direct alternatives to @racket[call/cc].
 ]
 }
 
+@defproc[(goto [k (-> any/c none/c)] [v any/c k]) none/c]{
+
+Jumps to the label @racket[k], passing @racket[v] as the value
+delivered at the jump target. If @racket[v] is omitted, it defaults to
+@racket[k] itself—this is consistent with the interpretation that
+@racket[goto] is itself a @racket[Label], since
+@racket[Label] = @racket[(¬ Label)].
+
+Equivalent definitions:
+
+@racketblock[
+(define (goto k [v k]) (k v))
+]
+
+Using @racket[cc]:
+
+@racketblock[
+(define (goto k [v k]) (cc k v))
+]
+}
+
 @defproc*[([(current-continuation [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]
            [(current-continuation [k (-> any/c ... none/c)] [v any/c] ...) none/c])]{
+
+The core operator of this package, combining the Law of Excluded Middle
+(@tech{LEM}) and the Law of Noncontradiction (@tech{LNC}) into a single procedure.
+
+@bold{Zero arguments or prompt tag} (@deftech{LEM} — @racket[(∀ (a) (→ (∪ a (¬ a))))]):
+Captures the current continuation and returns it as a function.
+The first time @racket[(current-continuation)] is evaluated, it returns
+a continuation of type @racket[(¬ a)] — a function that, when called
+with a value of type @racket[a], jumps back to this point, causing
+@racket[(current-continuation)] to "return again" with that value.
+Thus the overall return type is @racket[(∪ a (¬ a))].
+
+@bold{Continuation and values} (@deftech{LNC} — @racket[(∀ (a) (→ (¬ a) a ⊥))]):
+Invokes the continuation @racket[k] with the given values @racket[v ...].
+This never returns to the caller (return type @racket[⊥]).
+
+The optional @racket[prompt-tag] argument specifies which continuation
+prompt to capture up to, defaulting to
+@racket[(default-continuation-prompt-tag)].
+
+Implementation using @racket[call/cc]:
+
 @racketblock[
 (define current-continuation
   (case-λ
@@ -54,6 +127,8 @@ which are simpler, more direct alternatives to @racket[call/cc].
          (p))]
     [(k . v*) (apply k v*)]))
 ]
+
+Implementation using @racket[label] and @racket[goto]:
 
 @racketblock[
 (define current-continuation
@@ -72,12 +147,19 @@ which are simpler, more direct alternatives to @racket[call/cc].
 
 @defproc*[([(cc [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]
            [(cc [k (-> any/c ... none/c)] [v any/c] ...) none/c])]{
-Is an alias for @racket[current-continuation].
+An alias for @racket[current-continuation].
 }
 
+@subsection{Typed Racket Definitions}
+
+The following type definitions are provided for use with Typed Racket.
+They formalize the correspondence between control operators and
+classical logic.
 
 @deftype[⊥]{
-Is an alias for @racket[Nothing].
+The empty type, representing a computation that never produces a value
+(i.e., diverges or transfers control elsewhere).
+An alias for @racket[Nothing].
 
 @racketblock[
 (define-type ⊥ Nothing)
@@ -85,21 +167,32 @@ Is an alias for @racket[Nothing].
 }
 
 @deftypeconstr[(¬ a)]{
+The negation of type @racket[a]: a function that consumes an @racket[a]
+and never returns. In the Curry–Howard correspondence, this is
+logical negation.
+
 @racketblock[
 (define-type (¬ a) (→ a ⊥))
 ]
 }
 
 @deftype[Label]{
-Is the fixed point of @racket[¬].
+The type of first-class labels. Defined as the fixed point of @racket[¬]:
+a label is a function that accepts a label and never returns.
 
 @racketblock[
 (define-type Label (¬ Label))
 ]
+
+This recursive type reflects the fact that @racket[goto] itself is
+a @racket[Label].
 }
 
 @deftypeconstr[(LEM a)]{
-Is the Law of Excluded Middle.
+The Law of Excluded Middle as a type: for any @racket[a], you either
+have a value of type @racket[a] or a continuation of type
+@racket[(¬ a)]. This is the return type of @racket[(cc)] when called
+with zero arguments.
 
 @racketblock[
 (define-type (LEM a) (∪ a (¬ a)))
@@ -108,7 +201,13 @@ Is the Law of Excluded Middle.
 
 @section{Examples}
 
+Each example is shown in multiple styles—using @racket[call/cc],
+@racket[cc], and @racket[label]/@racket[goto]—to illustrate the
+trade-offs between the three approaches.
+
 @subsection{Loop}
+
+A simple counted loop using a first-class label:
 
 @racketblock[
 (let ([x 0])
@@ -118,7 +217,11 @@ Is the Law of Excluded Middle.
   (displayln x))
 ]
 
-@subsection{Return}
+@subsection{Early Return}
+
+Short-circuiting a product computation when a zero is encountered.
+
+Using @racket[call/cc]:
 
 @racketblock[
 (define (mul . r*)
@@ -131,6 +234,8 @@ Is the Law of Excluded Middle.
            (* res r))))))
 ]
 
+Using @racket[cc]:
+
 @racketblock[
 (define (mul . r*)
   (define result (cc))
@@ -142,6 +247,8 @@ Is the Law of Excluded Middle.
           (* res r))))
   result)
 ]
+
+Using @racket[label] and @racket[goto]:
 
 @racketblock[
 (define (mul . r*)
@@ -160,11 +267,28 @@ Is the Law of Excluded Middle.
 
 @subsection{Yin-Yang Puzzle}
 
+David Madore's famous puzzle, which exploits the fact that
+@racket[goto] is itself a @racket[Label]. Since
+@racket[Label] = @racket[(¬ Label)], any label can be passed to
+any other label.
+
+@racketblock[
+(let ([yin (label)])
+  (display #\@)
+  (let ([yang (label)])
+    (display #\*)
+    (yin yang)))
+]
+
+Using @racket[call/cc]:
+
 @racketblock[
 (let* ([kn   ((λ (k) (display #\@) k) (call/cc (λ (k) k)))]
        [kn+1 ((λ (k) (display #\*) k) (call/cc (λ (k) k)))])
   (kn kn+1))
 ]
+
+Using @racket[cc]:
 
 @racketblock[
 (let ([kn (cc)])
@@ -173,6 +297,8 @@ Is the Law of Excluded Middle.
     (display #\*)
     (cc kn kn+1)))
 ]
+
+Using @racket[label] and @racket[goto]:
 
 @racketblock[
 (let* ([k #f] [k0 (label)])
@@ -184,6 +310,8 @@ Is the Law of Excluded Middle.
     (goto kn)))
 ]
 
+CPS transform (no continuations at all):
+
 @racketblock[
 (define (k0 kn)
   (display #\@)
@@ -194,7 +322,9 @@ Is the Law of Excluded Middle.
 (k0 k0)
 ]
 
-@subsection{Call with Current Continuation}
+@subsection{Defining @racket[call/cc]}
+
+@racket[call/cc] can be defined in terms of @racket[cc]:
 
 @racketblock[
 (define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
@@ -203,6 +333,8 @@ Is the Law of Excluded Middle.
       (apply values v*)
       (proc (λ vs (cc v* vs)))))
 ]
+
+And in terms of @racket[label] and @racket[goto]:
 
 @racketblock[
 (define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
@@ -213,7 +345,12 @@ Is the Law of Excluded Middle.
       (proc (λ vs (set! v* vs) (goto l)))))
 ]
 
-@subsection{Light-Weight Process}
+@subsection{Light-Weight Processes}
+
+A simple cooperative multitasking scheduler. Multiple "threads" yield
+control with pause and are round-robin scheduled through a queue.
+
+Using @racket[call/cc]:
 
 @racketblock[
 (let ([lwp-queue (make-queue)])
@@ -236,6 +373,8 @@ Is the Law of Excluded Middle.
   (start))
 ]
 
+Using @racket[cc]:
+
 @racketblock[
 (let ([lwp-queue (make-queue)])
   (define (lwp thk)
@@ -256,6 +395,8 @@ Is the Law of Excluded Middle.
   (lwp (λ () (let f () (pause) (newline)     (f))))
   (start))
 ]
+
+Using @racket[label] and @racket[goto]:
 
 @racketblock[
 (let ([lwp-queue (make-queue)])
@@ -281,6 +422,12 @@ Is the Law of Excluded Middle.
 ]
 
 @subsection{Ambiguous Operator}
+
+McCarthy's amb operator for nondeterministic programming via
+backtracking. The operator explores alternatives depth-first and
+backtracks on failure.
+
+Using @racket[call/cc]:
 
 @racketblock[
 (let ([task* '()])
@@ -314,6 +461,8 @@ Is the Law of Excluded Middle.
     (list w-1 w-2 w-3 w-4)))
 ]
 
+Using @racket[cc]:
+
 @racketblock[
 (let ([task* '()])
   (define (fail)
@@ -344,6 +493,8 @@ Is the Law of Excluded Middle.
     (unless (joins? w-3 w-4) (amb))
     (list w-1 w-2 w-3 w-4)))
 ]
+
+Using @racket[label] and @racket[goto]:
 
 @racketblock[
 (let ([task* '()])
@@ -377,3 +528,5 @@ Is the Law of Excluded Middle.
     (unless (joins? w-3 w-4) (amb))
     (list w-1 w-2 w-3 w-4)))
 ]
+
+All three produce @racket['("that" "thing" "grows" "slowly")].
