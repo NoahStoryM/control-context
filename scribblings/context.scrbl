@@ -265,63 +265,6 @@ Using @racket[label] and @racket[goto]:
   result)
 ]
 
-@subsection{Yin-Yang Puzzle}
-
-David Madore's famous puzzle, which exploits the fact that
-@racket[goto] is itself a @racket[Label]. Since
-@racket[Label] = @racket[(¬ Label)], any label can be passed to
-any other label.
-
-@racketblock[
-(let ([yin (label)])
-  (display #\@)
-  (let ([yang (label)])
-    (display #\*)
-    (yin yang)))
-]
-
-Using @racket[call/cc]:
-
-@racketblock[
-(let* ([kn   ((λ (k) (display #\@) k) (call/cc (λ (k) k)))]
-       [kn+1 ((λ (k) (display #\*) k) (call/cc (λ (k) k)))])
-  (kn kn+1))
-]
-
-Using @racket[cc]:
-
-@racketblock[
-(let ([kn (cc)])
-  (display #\@)
-  (let ([kn+1 (cc)])
-    (display #\*)
-    (cc kn kn+1)))
-]
-
-Using @racket[label] and @racket[goto]:
-
-@racketblock[
-(let* ([k #f] [k0 (label)])
-  (unless k (set! k k0) (goto k))
-  (display #\@)
-  (let* ([kn k] [kn+1 (label)])
-    (when (eq? kn k) (set! k kn+1) (goto k))
-    (display #\*)
-    (goto kn)))
-]
-
-CPS transform (no continuations at all):
-
-@racketblock[
-(define (k0 kn)
-  (display #\@)
-  (define (kn+1 k)
-    (display #\*)
-    (kn k))
-  (kn+1 kn+1))
-(k0 k0)
-]
-
 @subsection{Light-Weight Processes}
 
 A simple cooperative multitasking scheduler. Multiple "threads" yield
@@ -507,6 +450,65 @@ Using @racket[label] and @racket[goto]:
 ]
 
 All three produce @racket['("that" "thing" "grows" "slowly")].
+
+@subsection{Yin-Yang Puzzle}
+
+David Madore's famous puzzle, which exploits the fact that
+@racket[goto] is itself a @racket[Label]. Since
+@racket[Label] = @racket[(¬ Label)], any label can be passed to
+any other label.
+
+@racketblock[
+(let ([yin (label)])
+  (display #\@)
+  (let ([yang (label)])
+    (display #\*)
+    (yin yang)))
+]
+
+Using @racket[call/cc]:
+
+@racketblock[
+(let ([kn (call/cc (λ (k) k))])
+  (display #\@)
+  (let ([kn+1 (call/cc (λ (k) k))])
+    (display #\*)
+    (kn kn+1)))
+]
+
+Using @racket[cc]:
+
+@racketblock[
+(let ([kn (cc)])
+  (display #\@)
+  (let ([kn+1 (cc)])
+    (display #\*)
+    (cc kn kn+1)))
+]
+
+Using @racket[label] and @racket[goto]:
+
+@racketblock[
+(let* ([k #f] [k0 (label)])
+  (unless k (set! k k0) (goto k))
+  (display #\@)
+  (let* ([kn k] [kn+1 (label)])
+    (when (eq? kn k) (set! k kn+1) (goto k))
+    (display #\*)
+    (goto kn)))
+]
+
+CPS transform (no continuations at all):
+
+@racketblock[
+(define (k0 kn)
+  (display #\@)
+  (define (kn+1 k)
+    (display #\*)
+    (kn k))
+  (kn+1 kn+1))
+(k0 k0)
+]
 
 @subsection{Defining @racket[call/cc]}
 
