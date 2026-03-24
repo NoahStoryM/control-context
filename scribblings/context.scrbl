@@ -322,29 +322,6 @@ CPS transform (no continuations at all):
 (k0 k0)
 ]
 
-@subsection{Defining @racket[call/cc]}
-
-@racket[call/cc] can be defined in terms of @racket[cc]:
-
-@racketblock[
-(define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
-  (define v* (cc prompt-tag))
-  (if (list? v*)
-      (apply values v*)
-      (proc (λ vs (cc v* vs)))))
-]
-
-And in terms of @racket[label] and @racket[goto]:
-
-@racketblock[
-(define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
-  (define v* #f)
-  (define l (label prompt-tag))
-  (if v*
-      (apply values v*)
-      (proc (λ vs (set! v* vs) (goto l)))))
-]
-
 @subsection{Light-Weight Processes}
 
 A simple cooperative multitasking scheduler. Multiple "threads" yield
@@ -530,3 +507,26 @@ Using @racket[label] and @racket[goto]:
 ]
 
 All three produce @racket['("that" "thing" "grows" "slowly")].
+
+@subsection{Defining @racket[call/cc]}
+
+@racket[call/cc] can be defined in terms of @racket[cc]:
+
+@racketblock[
+(define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
+  (define v* (cc prompt-tag))
+  (if (list? v*)
+      (apply values v*)
+      (proc (λ vs (cc v* vs)))))
+]
+
+And in terms of @racket[label] and @racket[goto]:
+
+@racketblock[
+(define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
+  (define v* #f)
+  (define l (label prompt-tag))
+  (if v*
+      (apply values v*)
+      (proc (λ vs (set! v* vs) (goto l)))))
+]
