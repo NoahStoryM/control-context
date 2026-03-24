@@ -3,10 +3,106 @@
 #+EMAIL: noahstorym@gmail.com
 
 * Table of Contents                                       :TOC_5_gh:noexport:
-- [[#raco-pkg-install-control-context][raco pkg install control-context]]
+- [[#overview][Overview]]
+- [[#installation][Installation]]
+- [[#quick-start][Quick Start]]
+  - [[#loop-with-label-and-goto][Loop with =label= and =goto=]]
+  - [[#early-return-with-cc][Early return with =cc=]]
+  - [[#defining-callcc-from-cc][Defining =call/cc= from =cc=]]
+  - [[#defining-label-and-goto-from-callcc][Defining =label= and =goto= from =call/cc=]]
+- [[#api-summary][API Summary]]
+  - [[#type-logic-correspondence][Type-Logic Correspondence]]
+  - [[#license][License]]
 
-* raco pkg install control-context
+* Overview
+
+This package provides =label=, =goto=, and =cc= (short for =current-continuation=), which are simpler, more direct alternatives to =call/cc=.
+
+The key idea is that continuations can be understood through three equivalent lenses, each with different trade-offs:
+
+- *First-class labels* (=label= + =goto=) — conceptually the simplest, with a trivial type (=Label=), but requires mutation (=set!=) to communicate across jumps.
+- *Law of Excluded Middle + Law of Noncontradiction* (=cc=) — eliminates the need for mutation by returning a union type =a ∪ ¬a=, at the cost of branching on whether you received a value or a continuation.
+- *Peirce's law* (=call/cc=) — eliminates both mutation and union types by delivering the continuation as an argument to a callback, at the cost of a more complex higher-order type signature.
+
+All three are equivalent in expressive power. This package provides the first two as building blocks, and shows how =call/cc= can be defined in terms of them (and vice versa).
+
+* Installation
+
+#+begin_src shell
+raco pkg install control-context
+#+end_src
+
+* Quick Start
 
 #+begin_src racket
 (require control/context)
 #+end_src
+
+** Loop with =label= and =goto=
+
+#+begin_src racket
+(let ([x 0])
+  (define loop (label))
+  (set! x (add1 x))
+  (when (< x 7) (goto loop))
+  (displayln x))
+;; prints: 7
+#+end_src
+
+** Early return with =cc=
+
+#+begin_src racket
+(define (mul . r*)
+  (define result (cc))
+  (if (real? result)
+      result
+      (for/fold ([res (*)] #:result (cc result res))
+                ([r (in-list r*)])
+        (if (zero? r)
+            (cc result r)
+            (* res r)))))
+
+(mul 1 2 3 0 5) ; => 0
+(mul 1 2 3 4 5) ; => 120
+#+end_src
+
+** Defining =call/cc= from =cc=
+
+#+begin_src racket
+(define (call/cc proc [prompt-tag (default-continuation-prompt-tag)])
+  (define v* (cc prompt-tag))
+  (if (list? v*)
+      (apply values v*)
+      (proc (λ vs (cc v* vs)))))
+#+end_src
+
+** Defining =label= and =goto= from =call/cc=
+
+#+begin_src racket
+(define (goto l [v l]) (l v))
+(define (label) (call/cc goto))
+#+end_src
+
+* API Summary
+
+| Procedure | Signature                                    | Description                                                                 |
+|-----------+----------------------------------------------+-----------------------------------------------------------------------------|
+| =label=   | =[prompt-tag] → any/c=                       | Capture the current position as a first-class label                         |
+| =goto=    | =k [v] → none/c=                             | Jump to a label, optionally passing a value                                 |
+| =cc=      | =[prompt-tag] → any/c= or =k v ... → none/c= | LEM (0 args): get value or continuation; LNC (1+ args): invoke continuation |
+
+See the [[https://docs.racket-lang.org/control-context/][documentation]] for full details, typed definitions (=⊥=, =¬=, =Label=, =LEM=), and worked examples including loops, early return, the Yin-Yang puzzle, lightweight processes, and the ambiguous operator.
+
+** Type-Logic Correspondence
+
+| Type           | Logic                       | Operator               |
+|----------------+-----------------------------+------------------------|
+| =Label=        | —                           | =label= + =goto=       |
+| =a ∨ ¬a=       | Law of Excluded Middle      | =cc= (0 args)          |
+| =¬(¬a ∧ a)=    | Law of Noncontradiction     | =cc= (1+ args)         |
+| =(¬a → a) → a= | Peirce's Law                | =call/cc=              |
+| =¬¬a → a=      | Double Negation Elimination | =call/cc= (restricted) |
+
+** License
+
+MIT. See =LICENSE= for details.
