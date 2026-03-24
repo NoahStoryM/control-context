@@ -24,12 +24,21 @@ which are simpler, more direct alternatives to @racket[call/cc].
 @racketblock[
 (define (goto k [v k]) (k v))
 ]
+
+@racketblock[
+(define (goto k [v k]) (cc k v))
+]
 }
 
 @defproc[(label [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]{
 @racketblock[
 (define (label [prompt-tag (default-continuation-prompt-tag)])
   (call/cc goto prompt-tag))
+]
+
+@racketblock[
+(define (label [prompt-tag (default-continuation-prompt-tag)])
+  (cc prompt-tag))
 ]
 }
 
@@ -38,8 +47,22 @@ which are simpler, more direct alternatives to @racket[call/cc].
 @racketblock[
 (define current-continuation
   (case-λ
-    [() (call/cc values)]
+    [() (current-continuation (default-continuation-prompt-tag))]
     [(p) (if (continuation-prompt-tag? p) (call/cc values p) (p))]
+    [(k . v*) (apply k v*)]))
+]
+
+@racketblock[
+(define current-continuation
+  (case-λ
+    [() (current-continuation (default-continuation-prompt-tag))]
+    [(p)
+     (if (continuation-prompt-tag? p)
+         (let* ([v* #f] [l (label p)])
+           (if v*
+               (apply values v*)
+               (λ vs (set! v* vs) (goto l))))
+         (p))]
     [(k . v*) (apply k v*)]))
 ]
 }
