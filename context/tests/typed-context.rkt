@@ -1,7 +1,7 @@
 #lang typed/racket/base
 
 (require typed/rackunit)
-(require "../context.rkt")
+(require "../main.rkt")
 
 (displayln 'Start)
 

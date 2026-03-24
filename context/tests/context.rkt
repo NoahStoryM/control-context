@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require rackunit)
-(require "../context.rkt")
+(require "../main.rkt")
 
 (displayln 'Start)
 
