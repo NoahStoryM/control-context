@@ -9,5 +9,6 @@
 (require/typed/provide "private/context.rkt"
   [label (→* () (Prompt-TagTop) Label)]
   [goto (∀ (a) (case→ (→ Label ⊥) (→ (¬ a) a ⊥)))]
-  [current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥)))])
-(provide (rename-out [current-continuation cc]))
+  [current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥)))]
+  [return-with-current-continuation (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a))))])
+(provide (rename-out [current-continuation cc] [return-with-current-continuation return/cc]))
