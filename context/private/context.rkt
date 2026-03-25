@@ -1,16 +1,29 @@
 #lang racket/base
 
+(require racket/format racket/string)
+
 (provide absurd
          goto label
          current-continuation
          return-with-current-continuation)
 
 
+(define expected:none/c (unquoted-printing-string "none/c"))
+(define ((make-raise-results-error name) . v*)
+  (raise-arguments-error
+   name
+   "contract violation"
+   "expected" expected:none/c
+   "results" (unquoted-printing-string (string-join (map ~v v*) "\n"))))
+(define raise-results-error:goto (make-raise-results-error 'goto))
+(define raise-results-error:cc (make-raise-results-error 'current-continuation))
+
+
 (define absurd (case-λ))
 
 (define (goto k [v k])
   (if (procedure? k)
-      (raise-result-error 'goto "none/c" (k v))
+      (call-with-values (λ () (k v)) raise-results-error:goto)
       (raise-argument-error 'goto "(-> any/c none/c)" k)))
 (define (label [prompt-tag (default-continuation-prompt-tag)])
   (unless (continuation-prompt-tag? prompt-tag)
@@ -25,13 +38,13 @@
        [(continuation-prompt-tag? p)
         (call/cc values p)]
        [(and (procedure? p) (procedure-arity-includes? p 0))
-        (raise-result-error 'current-continuation "none/c" (p))]
+        (call-with-values p raise-results-error:cc)]
        [else
         (raise-argument-error 'current-continuation "(or/c continuation-prompt-tag? (-> none/c))" p)])]
-    [(k v1      ) (raise-result-error 'current-continuation "none/c" (k v1      ))]
-    [(k v1 v2   ) (raise-result-error 'current-continuation "none/c" (k v1 v2   ))]
-    [(k v1 v2 v3) (raise-result-error 'current-continuation "none/c" (k v1 v2 v3))]
-    [(k . v*    ) (raise-result-error 'current-continuation "none/c" (apply k v*))]))
+    [(k v1      ) (call-with-values (λ () (k v1      )) raise-results-error:cc)]
+    [(k v1 v2   ) (call-with-values (λ () (k v1 v2   )) raise-results-error:cc)]
+    [(k v1 v2 v3) (call-with-values (λ () (k v1 v2 v3)) raise-results-error:cc)]
+    [(k . v*    ) (call-with-values (λ () (apply k v*)) raise-results-error:cc)]))
 
 (define (return-with-current-continuation thk [prompt-tag (default-continuation-prompt-tag)])
   (unless (and (procedure? thk) (procedure-arity-includes? thk 0))
