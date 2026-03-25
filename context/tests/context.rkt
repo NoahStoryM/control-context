@@ -1,7 +1,6 @@
 #lang racket/base
 
 (require rackunit
-         racket/function
          racket/list
          racket/string
          data/queue
