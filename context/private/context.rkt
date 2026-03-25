@@ -8,6 +8,8 @@
       (raise-result-error 'goto "none/c" (k v))
       (raise-argument-error 'goto "(-> any/c none/c)" k)))
 (define (label [prompt-tag (default-continuation-prompt-tag)])
+  (unless (continuation-prompt-tag? prompt-tag)
+    (raise-argument-error 'label "continuation-prompt-tag?" prompt-tag))
   (call/cc values prompt-tag))
 
 (define current-continuation
