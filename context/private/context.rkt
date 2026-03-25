@@ -19,10 +19,10 @@
      (cond
        [(continuation-prompt-tag? p)
         (call/cc values p)]
-       [(procedure? p)
+       [(and (procedure? p) (procedure-arity-includes? p 0))
         (raise-result-error 'current-continuation "none/c" (p))]
        [else
-        (raise-argument-error 'current-continuation "(or/c continuation-prompt-tag? (-> any/c none/c))" p)])]
+        (raise-argument-error 'current-continuation "(or/c continuation-prompt-tag? (-> none/c))" p)])]
     [(k v1      ) (raise-result-error 'current-continuation "none/c" (k v1      ))]
     [(k v1 v2   ) (raise-result-error 'current-continuation "none/c" (k v1 v2   ))]
     [(k v1 v2 v3) (raise-result-error 'current-continuation "none/c" (k v1 v2 v3))]
