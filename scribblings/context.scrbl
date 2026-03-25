@@ -4,7 +4,11 @@
                      racket/contract/base
                      racket/function
                      racket/sequence
-                     (only-in typed/racket/base : ∀ ∪ → Nothing define-type)
+                     (only-in typed/racket/base
+                              : ∀ ∪ → →* case→
+                              define-type
+                              Nothing
+                              Prompt-TagTop)
                      data/queue
                      control/context)
           "utils.rkt")
@@ -15,8 +19,10 @@
 
 @section{Overview}
 
-This package provides @racket[label], @racket[goto], and @racket[cc]
+This package provides @racket[label], @racket[goto], @racket[cc]
 (short for @racket[current-continuation]),
+@racket[return/cc] (short for @racket[return-with-current-continuation]),
+and @racket[absurd],
 which are simpler, more direct alternatives to @racket[call/cc].
 
 The key idea is that continuations can be understood through three
@@ -45,7 +51,30 @@ All three are equivalent in expressive power. This package provides
 the first two as building blocks, and shows how @racket[call/cc] can
 be defined in terms of them (and vice versa).
 
+Additionally, the package provides @racket[return/cc], which combines
+@racket[cc] and @racket[call/cc] to create @tech{context-frozen thunks}:
+continuations of type @racket[(¬ (¬ a))] that, when invoked via
+@racket[call/cc], evaluate their body in the @emph{original} evaluation
+context (exception handlers, @racket[dynamic-wind] guards,
+@racket[parameterize] bindings, etc.) while still reflecting the
+@emph{current} variable environment.
+
 @section{API Reference}
+
+@defproc[(absurd) any]{
+
+The @bold{Principle of Explosion} (@italic{ex falso quodlibet}):
+from falsehood, anything follows.
+
+It is a function that matches no arguments and therefore cannot be
+invoked:
+
+@racketblock[
+(: absurd (∀ (b) (→ ⊥ b)))
+(define absurd (case-λ))
+]
+
+}
 
 @defproc[(label [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]{
 
@@ -60,6 +89,7 @@ prompt to capture up to, defaulting to
 Implementation using @racket[call/cc]:
 
 @racketblock[
+(: label (→* () (Prompt-TagTop) Label))
 (define (label [prompt-tag (default-continuation-prompt-tag)])
   (call/cc goto prompt-tag))
 ]
@@ -67,6 +97,7 @@ Implementation using @racket[call/cc]:
 Implementation using @racket[cc]:
 
 @racketblock[
+(: label (→* () (Prompt-TagTop) Label))
 (define (label [prompt-tag (default-continuation-prompt-tag)])
   (cc prompt-tag))
 ]
@@ -83,12 +114,14 @@ delivered at the jump target. If @racket[v] is omitted, it defaults to
 Equivalent definitions:
 
 @racketblock[
+(: goto (∀ (a) (case→ (→ Label ⊥) (→ (¬ a) a ⊥))))
 (define (goto k [v k]) (k v))
 ]
 
 Using @racket[cc]:
 
 @racketblock[
+(: goto (∀ (a) (case→ (→ Label ⊥) (→ (¬ a) a ⊥))))
 (define (goto k [v k]) (cc k v))
 ]
 }
@@ -99,7 +132,7 @@ Using @racket[cc]:
 The core operator of this package, combining the Law of Excluded Middle
 (@tech{LEM}) and the Law of Noncontradiction (@tech{LNC}) into a single procedure.
 
-@bold{Zero arguments or prompt tag} (@deftech{LEM} — @racket[(∀ (a) (→ (∪ a (¬ a))))]):
+@bold{Zero arguments or prompt tag} (@deftech{LEM}):
 Captures the current continuation and returns it as a function.
 The first time @racket[(current-continuation)] is evaluated, it returns
 a continuation of type @racket[(¬ a)] — a function that, when called
@@ -107,7 +140,7 @@ with a value of type @racket[a], jumps back to this point, causing
 @racket[(current-continuation)] to "return again" with that value.
 Thus the overall return type is @racket[(∪ a (¬ a))].
 
-@bold{Continuation and values} (@deftech{LNC} — @racket[(∀ (a) (→ (¬ a) a ⊥))]):
+@bold{Continuation and values} (@deftech{LNC}):
 Invokes the continuation @racket[k] with the given values @racket[v ...].
 This never returns to the caller (return type @racket[⊥]).
 
@@ -118,6 +151,7 @@ prompt to capture up to, defaulting to
 Implementation using @racket[call/cc]:
 
 @racketblock[
+(: current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥))))
 (define current-continuation
   (case-λ
     [() (current-continuation (default-continuation-prompt-tag))]
@@ -131,6 +165,7 @@ Implementation using @racket[call/cc]:
 Implementation using @racket[label] and @racket[goto]:
 
 @racketblock[
+(: current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥))))
 (define current-continuation
   (case-λ
     [() (current-continuation (default-continuation-prompt-tag))]
@@ -147,7 +182,52 @@ Implementation using @racket[label] and @racket[goto]:
 
 @defproc*[([(cc [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]
            [(cc [k (-> any/c ... none/c)] [v any/c] ...) none/c])]{
+
 An alias for @racket[current-continuation].
+}
+
+@defproc[(return-with-current-continuation
+          [thk (-> any)]
+          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
+         (-> (-> any/c ... none/c) none/c)]{
+
+@bold{Double Negation Introduction} (@deftech{DNI}):
+Takes a thunk of type @racket[(→ a)] and returns
+a @deftech{context-frozen thunk}—a continuation of type @racket[(¬ (¬ a))]
+that captures the current evaluation context.
+
+When the returned continuation is invoked (typically via
+@racket[call/cc] as double negation elimination), it jumps back to the
+evaluation context where @racket[return/cc] was originally called,
+evaluates @racket[thk] there, and delivers the result to the caller's
+continuation. This means the computation in @racket[thk] runs with the
+@emph{original} exception handlers, @racket[dynamic-wind] guards,
+@racket[parameterize] bindings, and other context-sensitive state,
+while still reflecting the @emph{current} variable environment.
+
+The optional @racket[prompt-tag] argument specifies which continuation
+prompt to capture up to, defaulting to
+@racket[(default-continuation-prompt-tag)].
+
+Implementation using @racket[cc]:
+
+@racketblock[
+(: return-with-current-continuation (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a)))))
+(define (return-with-current-continuation thk [prompt-tag (default-continuation-prompt-tag)])
+  (define first? #t)
+  (define k (cc prompt-tag))
+  (unless first? (call-with-values thk k))
+  (set! first? #f)
+  k)
+]
+}
+
+@defproc[(return/cc
+          [thk (-> any)]
+          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
+         (-> (-> any/c ... none/c) none/c)]{
+
+An alias for @racket[return-with-current-continuation].
 }
 
 @subsection{Typed Racket Definitions}
@@ -531,4 +611,77 @@ And in terms of @racket[label] and @racket[goto]:
   (if v*
       (apply values v*)
       (proc (λ vs (set! v* vs) (goto l)))))
+]
+
+@subsection{Context-Frozen Thunks}
+
+The @racket[return/cc] operator creates @tech{context-frozen thunks}:
+computations that evaluate their body in the evaluation context where
+they were @emph{defined}, not where they are @emph{called}. This
+freezes exception handlers, @racket[dynamic-wind] guards,
+@racket[parameterize] bindings, and other context-sensitive state,
+while ordinary mutable variables remain live.
+
+@subsubsection{Freezing @racket[parameterize] Bindings}
+
+A plain thunk evaluates in the caller's parameter context, but
+a @tech{context-frozen thunk} always evaluates in its birth context:
+
+@racketblock[
+(define a (make-parameter 1))
+(define b 111)
+(define f (return/cc (λ () (* (a) b))))
+(displayln (call/cc f))
+(code:comment "=> 111  (a=1, b=111)")
+(set! b 222)
+(displayln (call/cc f))
+(code:comment "=> 222  (a=1, b=222 — variable change is visible)")
+(parameterize ([a 2])
+  (displayln (call/cc f)))
+(code:comment "=> 222  (a=1, b=222 — parameterize at call site is invisible)")
+]
+
+Contrast with a plain thunk, which would yield @racket[444] in the
+last case because @racket[(a)] would be @racket[2].
+
+@subsubsection{Freezing Exception Handlers}
+
+The body of a @racket[return/cc] thunk runs under the exception
+handlers that were active at definition time, regardless of what
+handlers are active at the call site:
+
+@racketblock[
+(define f
+  (with-handlers ([exn:fail? (λ (e) (error "caught at birth"))])
+    (return/cc (λ () (error "boom")))))
+
+(code:comment "Calling from a context with a different handler:")
+(with-handlers ([exn:fail? (λ (e) (error "caught at call site"))])
+  (displayln (call/cc f)))
+(code:comment "=> \"caught at birth\"  (call-site handler is bypassed)")
+]
+
+@subsubsection{Freezing @racket[dynamic-wind] Guards}
+
+Entry and exit guards from the definition context are re-entered
+when the frozen thunk is invoked:
+
+@racketblock[
+(define f
+  (dynamic-wind
+    (λ () (displayln "[Entry] enter birth context"))
+    (λ () (return/cc (λ () (displayln "[Body] evaluate thunk"))))
+    (λ () (displayln "[Exit] leave birth context"))))
+
+(displayln "--- call ---")
+(call/cc f)
+(displayln "--- done ---")
+(code:comment "Output:")
+(code:comment "[Entry] enter birth context")
+(code:comment "[Exit] leave birth context")
+(code:comment "--- call ---")
+(code:comment "[Entry] enter birth context")
+(code:comment "[Body] evaluate thunk")
+(code:comment "[Exit] leave birth context")
+(code:comment "--- done ---")
 ]
