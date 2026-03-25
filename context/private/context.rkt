@@ -1,7 +1,12 @@
 #lang racket/base
 
-(provide goto label current-continuation return-with-current-continuation)
+(provide absurd
+         goto label
+         current-continuation
+         return-with-current-continuation)
 
+
+(define absurd (case-λ))
 
 (define (goto k [v k])
   (if (procedure? k)

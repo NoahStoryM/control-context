@@ -7,6 +7,7 @@
 (provide ⊥ ¬ Label LEM)
 
 (require/typed/provide "private/context.rkt"
+  [absurd (∀ (a) (→ ⊥ a))]
   [label (→* () (Prompt-TagTop) Label)]
   [goto (∀ (a) (case→ (→ Label ⊥) (→ (¬ a) a ⊥)))]
   [current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥)))]
