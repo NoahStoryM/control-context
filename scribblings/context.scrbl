@@ -19,11 +19,9 @@
 
 @section{Overview}
 
-This package provides @racket[label], @racket[goto], @racket[cc]
-(short for @racket[current-continuation]),
-@racket[return/cc] (short for @racket[return-with-current-continuation]),
-and @racket[absurd],
-which are simpler, more direct alternatives to @racket[call/cc].
+This package provides @racket[label], @racket[goto], and @racket[cc]
+(short for @racket[current-continuation]), which are simpler, more
+direct alternatives to @racket[call/cc].
 
 The key idea is that continuations can be understood through three
 equivalent lenses, each with different trade-offs:
@@ -51,13 +49,30 @@ All three are equivalent in expressive power. This package provides
 the first two as building blocks, and shows how @racket[call/cc] can
 be defined in terms of them (and vice versa).
 
-Additionally, the package provides @racket[return/cc], which combines
-@racket[cc] and @racket[call/cc] to create @tech{context-frozen thunks}:
-continuations of type @racket[(¬ (¬ a))] that, when invoked via
-@racket[call/cc], evaluate their body in the @emph{original} evaluation
-context (exception handlers, @racket[dynamic-wind] guards,
-@racket[parameterize] bindings, etc.) while still reflecting the
-@emph{current} variable environment.
+Additionally, the package provides three operators for constructing
+@tech{context-frozen thunks}—values of type @racket[(¬ (¬ a))] that
+freeze the current evaluation context and can later be triggered via
+@racket[call/cc] as double negation elimination:
+
+@itemlist[
+  @item{@racket[wait/fc] is the core primitive. It captures the current
+  evaluation context and hands a @emph{future} continuation—one that
+  does not yet exist at capture time—to a user-supplied function
+  @racket[proc]. Whatever @racket[proc] returns is delivered to that
+  future continuation. When @racket[proc] itself has type
+  @racket[(¬ (¬ a))], @racket[wait/fc] has type @racket[(¬ (¬ a)) → (¬ (¬ a))],
+  making frozen contexts directly composable.}
+
+  @item{@racket[return/cc] is @racket[wait/fc] specialized to plain
+  thunks: it ignores the future continuation and simply evaluates
+  @racket[thk] in the captured context, delivering the result
+  automatically.}
+
+  @item{@racket[return-with-values] is the trivial, purely functional
+  @deftech{Double Negation Introduction} (DNI): it wraps values of type
+  @racket[a] into a function of type @racket[(¬ (¬ a))] without
+  capturing any evaluation context. No continuations, no side effects.}
+]
 
 @section{API Reference}
 
@@ -186,6 +201,61 @@ Implementation using @racket[label] and @racket[goto]:
 An alias for @racket[current-continuation].
 }
 
+@defproc[(wait-for-future-continuation
+          [proc (-> (-> any/c ... none/c) any)]
+          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
+         (-> (-> any/c ... none/c) none/c)]{
+
+The core operator for constructing @tech{context-frozen thunks}.
+
+Takes a function @racket[proc] of type @racket[(→ (¬ a) a)] and
+captures the current evaluation context, returning a
+@tech{context-frozen thunk} of type @racket[(¬ (¬ a))].
+
+When the returned @tech{context-frozen thunk} is invoked with a continuation
+@racket[k] (typically via @racket[call/cc] as double negation elimination),
+control jumps back to the evaluation context where @racket[wait/fc] was
+originally called. There, @racket[proc] is called with @racket[k] as
+the @emph{future continuation}—a continuation that did not yet exist
+when @racket[wait/fc] was evaluated. Whatever @racket[proc] returns is
+delivered to @racket[k] via @racket[call-with-values].
+
+This means the computation in @racket[proc] runs with the @emph{original}
+exception handlers, @racket[dynamic-wind] guards, @racket[parameterize]
+bindings, and other context-sensitive state, while still reflecting the
+@emph{current} variable environment.
+
+When @racket[proc] always invokes @racket[k] (i.e., @racket[proc] has
+type @racket[(¬ (¬ a))]), the type of @racket[wait/fc] becomes
+@racket[(→ (¬ (¬ a)) (¬ (¬ a)))], making frozen contexts directly
+@bold{composable}: the output of one @racket[wait/fc] call can serve
+as the @racket[proc] argument of another.
+
+The optional @racket[prompt-tag] argument specifies which continuation
+prompt to capture up to, defaulting to
+@racket[(default-continuation-prompt-tag)].
+
+Implementation using @racket[cc]:
+
+@racketblock[
+(: wait/fc (∀ (a) (→* ((→ (¬ a) a)) (Prompt-TagTop) (¬ (¬ a)))))
+(define (wait/fc proc [prompt-tag (default-continuation-prompt-tag)])
+  (define first? #t)
+  (define k (cc prompt-tag))
+  (unless first? (call-with-values (λ () (proc k)) k))
+  (set! first? #f)
+  k)
+]
+}
+
+@defproc[(wait/fc
+          [proc (-> (-> any/c ... none/c) any)]
+          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
+         (-> (-> any/c ... none/c) none/c)]{
+
+An alias for @racket[wait-for-future-continuation].
+}
+
 @defproc[(return-with-current-continuation
           [thk (-> any)]
           [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
@@ -195,29 +265,22 @@ Takes a thunk of type @racket[(→ a)] and returns
 a @deftech{context-frozen thunk}—a continuation of type @racket[(¬ (¬ a))]
 that captures the current evaluation context.
 
-When the returned continuation is invoked (typically via
-@racket[call/cc] as double negation elimination), it jumps back to the
-evaluation context where @racket[return/cc] was originally called,
-evaluates @racket[thk] there, and delivers the result to the caller's
-continuation. This means the computation in @racket[thk] runs with the
-@emph{original} exception handlers, @racket[dynamic-wind] guards,
-@racket[parameterize] bindings, and other context-sensitive state,
-while still reflecting the @emph{current} variable environment.
+@racket[return/cc] is @racket[wait/fc] specialized to the case where
+the body is a plain thunk @racket[thk]. The future continuation is
+ignored. For cases where the body needs access to the future
+continuation—for example, to compose frozen contexts—use
+@racket[wait/fc] directly.
 
 The optional @racket[prompt-tag] argument specifies which continuation
 prompt to capture up to, defaulting to
 @racket[(default-continuation-prompt-tag)].
 
-Implementation using @racket[cc]:
+Implementation using @racket[wait/fc]:
 
 @racketblock[
-(: return-with-current-continuation (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a)))))
-(define (return-with-current-continuation thk [prompt-tag (default-continuation-prompt-tag)])
-  (define first? #t)
-  (define k (cc prompt-tag))
-  (unless first? (call-with-values thk k))
-  (set! first? #f)
-  k)
+(: return/cc (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a)))))
+(define (return/cc thk [prompt-tag (default-continuation-prompt-tag)])
+  (wait/fc (λ (_) (thk)) prompt-tag))
 ]
 }
 
@@ -227,6 +290,27 @@ Implementation using @racket[cc]:
          (-> (-> any/c ... none/c) none/c)]{
 
 An alias for @racket[return-with-current-continuation].
+}
+
+@defproc[(return-with-values [v any/c] ...) (-> (-> any/c ... none/c) none/c)]{
+
+The purely functional @tech{Double Negation Introduction} (DNI).
+
+Takes any number of values and returns a @tech{context-frozen thunk}
+of type @racket[(¬ (¬ a))] that, when invoked with a continuation
+@racket[k],simply delivers those values to @racket[k]. No continuation
+is captured; no evaluation context is frozen.
+
+@racketblock[
+(: return-with-values (∀ (a) (→ a (¬ (¬ a)))))
+(define (return-with-values . v*) (λ (k) (apply k v*)))
+]
+
+This is the logical fact that from @racket[a] we can always derive
+@racket[(¬ (¬ a))]: given a value, we can always construct a
+@tech{context-frozen thunk} that produces it, trivially, with no
+context to freeze. Compare with @racket[wait/fc] and @racket[return/cc],
+which do capture an evaluation context.
 }
 
 @subsection{Typed Racket Definitions}
@@ -614,22 +698,27 @@ And in terms of @racket[label] and @racket[goto]:
 
 @subsection{Context-Frozen Thunks}
 
-The @racket[return/cc] operator creates @tech{context-frozen thunks}:
-computations that evaluate their body in the evaluation context where
-they were @emph{defined}, not where they are @emph{called}. This
-freezes exception handlers, @racket[dynamic-wind] guards,
-@racket[parameterize] bindings, and other context-sensitive state,
-while ordinary mutable variables remain live.
+The @racket[wait/fc] operator creates @tech{context-frozen thunks}:
+computations that run in the evaluation context where they were
+@emph{defined}, not where they are @emph{called}. This freezes
+exception handlers, @racket[dynamic-wind] guards, @racket[parameterize]
+bindings, and other context-sensitive state, while ordinary mutable
+variables remain live. @racket[return/cc] is the specialization of
+@racket[wait/fc] to plain thunks. @racket[return-with-values] is the
+degenerate case where no context is frozen at all.
 
 @subsubsection{Freezing @racket[parameterize] Bindings}
 
-A plain thunk evaluates in the caller's parameter context, but
-a @tech{context-frozen thunk} always evaluates in its birth context:
+A plain thunk evaluates in the caller's parameter context. A
+@tech{context-frozen thunk} always evaluates in its birth context,
+regardless of what @racket[parameterize] bindings are active at the
+call site. With @racket[wait/fc], the future continuation is available
+to @racket[proc], which decides what value to return:
 
 @racketblock[
 (define a (make-parameter 1))
 (define b 111)
-(define f (return/cc (λ () (* (a) b))))
+(define f (wait/fc (λ (_) (* (a) b))))
 (displayln (call/cc f))
 (code:comment "=> 111  (a=1, b=111)")
 (set! b 222)
@@ -640,19 +729,26 @@ a @tech{context-frozen thunk} always evaluates in its birth context:
 (code:comment "=> 222  (a=1, b=222 — parameterize at call site is invisible)")
 ]
 
-Contrast with a plain thunk, which would yield @racket[444] in the
-last case because @racket[(a)] would be @racket[2].
+Contrast with a plain thunk, which would yield @racket[444] in the last
+case because @racket[(a)] would be @racket[2]. Also contrast with
+@racket[return-with-values], which captures no context at all:
+
+@racketblock[
+(define g (return-with-values 42))
+(parameterize ([a 99]) (displayln (call/cc g)))
+(code:comment "=> 42  (no context frozen — the value was fixed at construction)")
+]
 
 @subsubsection{Freezing Exception Handlers}
 
-The body of a @racket[return/cc] thunk runs under the exception
+The body of a @tech{context-frozen thunk} runs under the exception
 handlers that were active at definition time, regardless of what
 handlers are active at the call site:
 
 @racketblock[
 (define f
   (with-handlers ([exn:fail? (λ (e) (error "caught at birth"))])
-    (return/cc (λ () (error "boom")))))
+    (wait/fc (λ (k) (error "boom")))))
 
 (code:comment "Calling from a context with a different handler:")
 (with-handlers ([exn:fail? (λ (e) (error "caught at call site"))])
@@ -669,7 +765,7 @@ when the frozen thunk is invoked:
 (define f
   (dynamic-wind
     (λ () (displayln "[Entry] enter birth context"))
-    (λ () (return/cc (λ () (displayln "[Body] evaluate thunk"))))
+    (λ () (wait/fc (λ (k) (displayln "[Body] evaluate thunk"))))
     (λ () (displayln "[Exit] leave birth context"))))
 
 (displayln "--- call ---")
@@ -684,3 +780,65 @@ when the frozen thunk is invoked:
 (code:comment "[Exit] leave birth context")
 (code:comment "--- done ---")
 ]
+
+@subsubsection{Composing Frozen Contexts}
+
+Since @racket[wait/fc] exposes the future continuation to @racket[proc],
+frozen contexts can be @bold{composed}: when @racket[proc] has type
+@racket[(¬ (¬ a))], @racket[wait/fc] has type @racket[(¬ (¬ a)) → (¬ (¬ a))],
+so the output of one @racket[wait/fc] can serve directly as the
+@racket[proc] argument of another.
+
+The future continuation passes through each frozen layer
+in sequence—like a relay baton—with each layer's @racket[dynamic-wind]
+guards firing as control enters and exits:
+
+@racketblock[
+(code:comment "Time 1: In context C1, create W1")
+(define W1
+  (dynamic-wind
+    (λ () (displayln "W1: Enter"))
+    (λ () (wait/fc
+           (λ (fc)
+             (displayln "Reached the innermost context C1")
+             (fc 'hello))))
+    (λ () (displayln "W1: Exit"))))
+
+(code:comment "Time 2: In context C2, wrap W1 in another layer")
+(define W2
+  (dynamic-wind
+    (λ () (displayln "W2: Enter"))
+    (λ () (wait/fc W1))
+    (λ () (displayln "W2: Exit"))))
+
+(code:comment "Time 3: In context C3, trigger W2")
+(dynamic-wind
+  (λ () (displayln "W3: Enter"))
+  (λ () (displayln (call/cc W2)))
+  (λ () (displayln "W3: Exit")))
+]
+
+Output:
+
+@racketblock[
+(code:comment "W1: Enter")
+(code:comment "W1: Exit")
+(code:comment "W2: Enter")
+(code:comment "W2: Exit")
+(code:comment "W3: Enter")
+(code:comment "W3: Exit")
+(code:comment "W2: Enter")
+(code:comment "W2: Exit")
+(code:comment "W1: Enter")
+(code:comment "Reached the innermost context C1")
+(code:comment "W1: Exit")
+(code:comment "W3: Enter")
+(code:comment "hello")
+(code:comment "W3: Exit")
+]
+
+When @racket[(call/cc W2)] is invoked in C3, the future continuation
+is delivered first to C2's frozen context, which forwards it to C1's
+frozen context via @racket[W1]. The innermost @racket[proc] finally
+receives the continuation and calls @racket[(fc 'hello)], sending
+@racket['hello] all the way back to C3.
