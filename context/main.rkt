@@ -11,5 +11,9 @@
   [label (→* () (Prompt-TagTop) Label)]
   [goto (∀ (a) (case→ (→ Label ⊥) (→ (¬ a) a ⊥)))]
   [current-continuation (∀ (a) (case→ (→* () (Prompt-TagTop) (∪ a (¬ a))) (→ (¬ a) a ⊥)))]
-  [return-with-current-continuation (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a))))])
-(provide (rename-out [current-continuation cc] [return-with-current-continuation return/cc]))
+  [wait-for-future-continuation (∀ (a) (→* ((→ (¬ a) a)) (Prompt-TagTop) (¬ (¬ a))))]
+  [return-with-current-continuation (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a))))]
+  [return-with-values (∀ (a) (→ a (¬ (¬ a))))])
+(provide (rename-out [current-continuation cc]
+                     [wait-for-future-continuation wait/fc]
+                     [return-with-current-continuation return/cc]))

@@ -5,7 +5,9 @@
 (provide absurd
          goto label
          current-continuation
-         return-with-current-continuation)
+         wait-for-future-continuation
+         return-with-current-continuation
+         return-with-values)
 
 
 (define expected:none/c (unquoted-printing-string "none/c"))
@@ -46,6 +48,16 @@
     [(k v1 v2 v3) (call-with-values (λ () (k v1 v2 v3)) raise-results-error:cc)]
     [(k . v*    ) (call-with-values (λ () (apply k v*)) raise-results-error:cc)]))
 
+(define (wait-for-future-continuation proc [prompt-tag (default-continuation-prompt-tag)])
+  (unless (and (procedure? proc) (procedure-arity-includes? proc 1))
+    (raise-argument-error 'wait-for-future-continuation "(-> (-> any/c ... none/c) any)" proc))
+  (unless (continuation-prompt-tag? prompt-tag)
+    (raise-argument-error 'wait-for-future-continuation "continuation-prompt-tag?" prompt-tag))
+  (define first? #t)
+  (define k (call/cc values prompt-tag))
+  (unless first? (call-with-values (λ () (proc k)) k))
+  (set! first? #f)
+  k)
 (define (return-with-current-continuation thk [prompt-tag (default-continuation-prompt-tag)])
   (unless (and (procedure? thk) (procedure-arity-includes? thk 0))
     (raise-argument-error 'return-with-current-continuation "(-> any)" thk))
@@ -56,3 +68,4 @@
   (unless first? (call-with-values thk k))
   (set! first? #f)
   k)
+(define (return-with-values . v*) (λ (k) (apply k v*)))
