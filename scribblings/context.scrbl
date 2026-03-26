@@ -126,7 +126,7 @@ Using @racket[cc]:
 ]
 }
 
-@defproc*[([(current-continuation [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]
+@defproc*[([(current-continuation [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any]
            [(current-continuation [k (-> any/c ... none/c)] [v any/c] ...) none/c])]{
 
 The core operator of this package, combining the Law of Excluded Middle
@@ -180,7 +180,7 @@ Implementation using @racket[label] and @racket[goto]:
 ]
 }
 
-@defproc*[([(cc [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any/c]
+@defproc*[([(cc [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)]) any]
            [(cc [k (-> any/c ... none/c)] [v any/c] ...) none/c])]{
 
 An alias for @racket[current-continuation].
