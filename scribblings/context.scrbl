@@ -60,7 +60,7 @@ freeze the current evaluation context and can later be triggered via
   does not yet exist at capture time—to a user-supplied function
   @racket[proc]. Whatever @racket[proc] returns is delivered to that
   future continuation. When @racket[proc] itself has type
-  @racket[(¬ (¬ a))], @racket[wait/fc] has type @racket[(¬ (¬ a)) → (¬ (¬ a))],
+  @racket[(¬ (¬ a))], @racket[wait/fc] has type @racket[(→ (¬ (¬ a)) (¬ (¬ a)))],
   making frozen contexts directly composable.}
 
   @item{@racket[return/cc] is @racket[wait/fc] specialized to plain
