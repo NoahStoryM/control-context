@@ -191,7 +191,6 @@ An alias for @racket[current-continuation].
           [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
          (-> (-> any/c ... none/c) none/c)]{
 
-@bold{Double Negation Introduction} (@deftech{DNI}):
 Takes a thunk of type @racket[(→ a)] and returns
 a @deftech{context-frozen thunk}—a continuation of type @racket[(¬ (¬ a))]
 that captures the current evaluation context.
