@@ -4,6 +4,7 @@
                      racket/contract/base
                      racket/function
                      racket/sequence
+                     racket/stream
                      (only-in typed/racket/base
                               : ∀ ∪ → →* case→
                               define-type
@@ -513,22 +514,29 @@ backtracks on failure.
 Using @racket[call/cc]:
 
 @racketblock[
-(let ([task* '()])
-  (define (fail)
-    (if (null? task*)
-        (error "Amb tree exhausted")
-        ((car task*))))
-  (define (amb* . alt*)
+(let ([pop! dequeue!]
+      [push-new! enqueue-front!]
+      [push-old! enqueue-front!]
+      [empty? queue-empty?]
+      [empty-handler (λ () (error "Amb tree exhausted"))]
+      [node* (make-queue)])
+  (define (run-node node) (node))
+  (define (make-node)
     (call/cc
-     (λ (task)
-       (unless (null? alt*)
-         (set! task* (cons task task*)))))
-    (when (null? alt*) (fail))
-    (define alt (car alt*))
-    (set! alt* (cdr alt*))
-    (when (null? alt*) (set! task* (cdr task*)))
-    (alt))
-  (define-syntax-rule (amb exp* ...) (amb* (λ () exp*) ...))
+     (λ (node)
+       (push-new! node* node))))
+
+  (define (fail)
+    (if (empty? node*)
+        (empty-handler)
+        (let ([node (pop! node*)])
+          (push-old! node* node)
+          (run-node node))))
+  (define-syntax-rule (amb e* ...)
+    (let ([s (stream e* ...)])
+      (make-node)
+      (when (stream-empty? s) (pop! node*) (fail))
+      (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -547,21 +555,29 @@ Using @racket[call/cc]:
 Using @racket[cc]:
 
 @racketblock[
-(let ([task* '()])
+(let ([pop! dequeue!]
+      [push-new! enqueue-front!]
+      [push-old! enqueue-front!]
+      [empty? queue-empty?]
+      [empty-handler (λ () (error "Amb tree exhausted"))]
+      [node* (make-queue)])
+  (define (run-node node) (cc node #f))
+  (define (make-node)
+    (let ([node (cc)])
+      (when node
+        (push-new! node* node))))
+
   (define (fail)
-    (if (null? task*)
-        (error "Amb tree exhausted")
-        (cc (car task*) #f)))
-  (define (amb* . alt*)
-    (define task (cc))
-    (when (null? alt*) (fail))
-    (when task
-      (set! task* (cons task task*)))
-    (define alt (car alt*))
-    (set! alt* (cdr alt*))
-    (when (null? alt*) (set! task* (cdr task*)))
-    (alt))
-  (define-syntax-rule (amb exp* ...) (amb* (λ () exp*) ...))
+    (if (empty? node*)
+        (empty-handler)
+        (let ([node (pop! node*)])
+          (push-old! node* node)
+          (run-node node))))
+  (define-syntax-rule (amb e* ...)
+    (let ([s (stream e* ...)])
+      (make-node)
+      (when (stream-empty? s) (pop! node*) (fail))
+      (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -580,23 +596,30 @@ Using @racket[cc]:
 Using @racket[label] and @racket[goto]:
 
 @racketblock[
-(let ([task* '()])
+(let ([pop! dequeue!]
+      [push-new! enqueue-front!]
+      [push-old! enqueue-front!]
+      [empty? queue-empty?]
+      [empty-handler (λ () (error "Amb tree exhausted"))]
+      [node* (make-queue)])
+  (define (run-node node) (goto node))
+  (define (make-node)
+    (let* ([first? #t] [node (label)])
+      (when first?
+        (set! first? #f)
+        (push-new! node* node))))
+
   (define (fail)
-    (if (null? task*)
-        (error "Amb tree exhausted")
-        (goto (car task*))))
-  (define (amb* . alt*)
-    (define first? #t)
-    (define task (label))
-    (when (null? alt*) (fail))
-    (when first?
-      (set! first? #f)
-      (set! task* (cons task task*)))
-    (define alt (car alt*))
-    (set! alt* (cdr alt*))
-    (when (null? alt*) (set! task* (cdr task*)))
-    (alt))
-  (define-syntax-rule (amb exp* ...) (amb* (λ () exp*) ...))
+    (if (empty? node*)
+        (empty-handler)
+        (let ([node (pop! node*)])
+          (push-old! node* node)
+          (run-node node))))
+  (define-syntax-rule (amb e* ...)
+    (let ([s (stream e* ...)])
+      (make-node)
+      (when (stream-empty? s) (pop! node*) (fail))
+      (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
