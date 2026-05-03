@@ -519,23 +519,23 @@ Using @racket[call/cc]:
       [push-old! enqueue-front!]
       [empty? queue-empty?]
       [empty-handler (λ () (error "Amb tree exhausted"))]
-      [choice-point* (make-queue)])
-  (define (run choice-point) (choice-point))
-  (define (make-choice-point)
+      [amb-frontier (make-queue)])
+  (define (run amb-node) (amb-node))
+  (define (make-amb-node)
     (call/cc
-     (λ (choice-point)
-       (push-new! choice-point* choice-point))))
+     (λ (amb-node)
+       (push-new! amb-frontier amb-node))))
 
   (define (fail)
-    (if (empty? choice-point*)
+    (if (empty? amb-frontier)
         (empty-handler)
-        (let ([choice-point (pop! choice-point*)])
-          (push-old! choice-point* choice-point)
-          (run choice-point))))
+        (let ([amb-node (pop! amb-frontier)])
+          (push-old! amb-frontier amb-node)
+          (run amb-node))))
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
-      (make-choice-point)
-      (when (stream-empty? s) (pop! choice-point*) (fail))
+      (make-amb-node)
+      (when (stream-empty? s) (pop! amb-frontier) (fail))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
@@ -560,23 +560,23 @@ Using @racket[cc]:
       [push-old! enqueue-front!]
       [empty? queue-empty?]
       [empty-handler (λ () (error "Amb tree exhausted"))]
-      [choice-point* (make-queue)])
-  (define (run choice-point) (cc choice-point #f))
-  (define (make-choice-point)
-    (let ([choice-point (cc)])
-      (when choice-point
-        (push-new! choice-point* choice-point))))
+      [amb-frontier (make-queue)])
+  (define (run amb-node) (cc amb-node #f))
+  (define (make-amb-node)
+    (let ([amb-node (cc)])
+      (when amb-node
+        (push-new! amb-frontier amb-node))))
 
   (define (fail)
-    (if (empty? choice-point*)
+    (if (empty? amb-frontier)
         (empty-handler)
-        (let ([choice-point (pop! choice-point*)])
-          (push-old! choice-point* choice-point)
-          (run choice-point))))
+        (let ([amb-node (pop! amb-frontier)])
+          (push-old! amb-frontier amb-node)
+          (run amb-node))))
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
-      (make-choice-point)
-      (when (stream-empty? s) (pop! choice-point*) (fail))
+      (make-amb-node)
+      (when (stream-empty? s) (pop! amb-frontier) (fail))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
@@ -601,24 +601,24 @@ Using @racket[label] and @racket[goto]:
       [push-old! enqueue-front!]
       [empty? queue-empty?]
       [empty-handler (λ () (error "Amb tree exhausted"))]
-      [choice-point* (make-queue)])
-  (define (run choice-point) (goto choice-point))
-  (define (make-choice-point)
-    (let* ([first? #t] [choice-point (label)])
+      [amb-frontier (make-queue)])
+  (define (run amb-node) (goto amb-node))
+  (define (make-amb-node)
+    (let* ([first? #t] [amb-node (label)])
       (when first?
         (set! first? #f)
-        (push-new! choice-point* choice-point))))
+        (push-new! amb-frontier amb-node))))
 
   (define (fail)
-    (if (empty? choice-point*)
+    (if (empty? amb-frontier)
         (empty-handler)
-        (let ([choice-point (pop! choice-point*)])
-          (push-old! choice-point* choice-point)
-          (run choice-point))))
+        (let ([amb-node (pop! amb-frontier)])
+          (push-old! amb-frontier amb-node)
+          (run amb-node))))
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
-      (make-choice-point)
-      (when (stream-empty? s) (pop! choice-point*) (fail))
+      (make-amb-node)
+      (when (stream-empty? s) (pop! amb-frontier) (fail))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
