@@ -526,7 +526,6 @@ Using @racket[call/cc]:
      (λ (amb-node)
        (push-new! amb-frontier amb-node)
        (next))))
-
   (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
@@ -568,7 +567,6 @@ Using @racket[cc]:
       (when amb-node
         (push-new! amb-frontier amb-node)
         (next))))
-
   (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
@@ -611,7 +609,6 @@ Using @racket[label] and @racket[goto]:
         (set! first? #f)
         (push-new! amb-frontier amb-node)
         (next))))
-
   (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
