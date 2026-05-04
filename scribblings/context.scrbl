@@ -532,13 +532,17 @@ Using @racket[call/cc]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define (sequence->amb s)
+  (define (stream-generate s)
+    (values
+     (λ () (not (stream-empty? s)))
+     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+  (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
     (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (sequence->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (sequence->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (sequence->amb (for*/stream c b* ...)))
+  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -575,13 +579,17 @@ Using @racket[cc]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define (sequence->amb s)
+  (define (stream-generate s)
+    (values
+     (λ () (not (stream-empty? s)))
+     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+  (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
     (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (sequence->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (sequence->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (sequence->amb (for*/stream c b* ...)))
+  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -619,13 +627,17 @@ Using @racket[label] and @racket[goto]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define (sequence->amb s)
+  (define (stream-generate s)
+    (values
+     (λ () (not (stream-empty? s)))
+     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+  (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
     (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (sequence->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (sequence->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (sequence->amb (for*/stream c b* ...)))
+  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
