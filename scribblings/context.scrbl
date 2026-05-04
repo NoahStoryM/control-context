@@ -532,11 +532,12 @@ Using @racket[call/cc]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define-syntax-rule (amb e* ...)
-    (let ([s (stream e* ...)])
-      (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (next))
-      (begin0 (stream-first s) (set! s (stream-rest s)))))
+  (define (amb* s)
+    (make-amb-node)
+    (when (stream-empty? s) (pop! amb-frontier) (next))
+    (begin0 (stream-first s) (set! s (stream-rest s))))
+  (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
+  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -573,11 +574,12 @@ Using @racket[cc]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define-syntax-rule (amb e* ...)
-    (let ([s (stream e* ...)])
-      (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (next))
-      (begin0 (stream-first s) (set! s (stream-rest s)))))
+  (define (amb* s)
+    (make-amb-node)
+    (when (stream-empty? s) (pop! amb-frontier) (next))
+    (begin0 (stream-first s) (set! s (stream-rest s))))
+  (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
+  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -615,11 +617,12 @@ Using @racket[label] and @racket[goto]:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define-syntax-rule (amb e* ...)
-    (let ([s (stream e* ...)])
-      (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (next))
-      (begin0 (stream-first s) (set! s (stream-rest s)))))
+  (define (amb* s)
+    (make-amb-node)
+    (when (stream-empty? s) (pop! amb-frontier) (next))
+    (begin0 (stream-first s) (set! s (stream-rest s))))
+  (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
+  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
