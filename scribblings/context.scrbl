@@ -524,9 +524,10 @@ Using @racket[call/cc]:
   (define (make-amb-node)
     (call/cc
      (λ (amb-node)
-       (push-new! amb-frontier amb-node))))
+       (push-new! amb-frontier amb-node)
+       (next))))
 
-  (define (fail)
+  (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
         (let ([amb-node (pop! amb-frontier)])
@@ -535,7 +536,7 @@ Using @racket[call/cc]:
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
       (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (fail))
+      (when (stream-empty? s) (pop! amb-frontier) (next))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
@@ -565,9 +566,10 @@ Using @racket[cc]:
   (define (make-amb-node)
     (let ([amb-node (cc)])
       (when amb-node
-        (push-new! amb-frontier amb-node))))
+        (push-new! amb-frontier amb-node)
+        (next))))
 
-  (define (fail)
+  (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
         (let ([amb-node (pop! amb-frontier)])
@@ -576,7 +578,7 @@ Using @racket[cc]:
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
       (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (fail))
+      (when (stream-empty? s) (pop! amb-frontier) (next))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
@@ -607,9 +609,10 @@ Using @racket[label] and @racket[goto]:
     (let* ([first? #t] [amb-node (label)])
       (when first?
         (set! first? #f)
-        (push-new! amb-frontier amb-node))))
+        (push-new! amb-frontier amb-node)
+        (next))))
 
-  (define (fail)
+  (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
         (let ([amb-node (pop! amb-frontier)])
@@ -618,7 +621,7 @@ Using @racket[label] and @racket[goto]:
   (define-syntax-rule (amb e* ...)
     (let ([s (stream e* ...)])
       (make-amb-node)
-      (when (stream-empty? s) (pop! amb-frontier) (fail))
+      (when (stream-empty? s) (pop! amb-frontier) (next))
       (begin0 (stream-first s) (set! s (stream-rest s)))))
 
   (let ([w-1 (amb "the" "that" "a")]
