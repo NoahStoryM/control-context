@@ -508,8 +508,8 @@ Using @racket[label] and @racket[goto]:
 @subsection{Ambiguous Operator}
 
 McCarthy's amb operator for nondeterministic programming via
-backtracking. The operator explores alternatives depth-first and
-backtracks on failure.
+backtracking. The operator explores alternatives and backtracks
+on failure.
 
 Using @racket[call/cc]:
 
