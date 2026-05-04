@@ -537,7 +537,8 @@ Using @racket[call/cc]:
     (when (stream-empty? s) (pop! amb-frontier) (next))
     (begin0 (stream-first s) (set! s (stream-rest s))))
   (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
-  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (amb* (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (amb* (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -579,7 +580,8 @@ Using @racket[cc]:
     (when (stream-empty? s) (pop! amb-frontier) (next))
     (begin0 (stream-first s) (set! s (stream-rest s))))
   (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
-  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (amb* (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (amb* (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
@@ -622,7 +624,8 @@ Using @racket[label] and @racket[goto]:
     (when (stream-empty? s) (pop! amb-frontier) (next))
     (begin0 (stream-first s) (set! s (stream-rest s))))
   (define-syntax-rule (amb e* ...) (amb* (stream e* ...)))
-  (define-syntax-rule (for/amb c b* ...) (amb* (for/stream c b* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (amb* (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (amb* (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
