@@ -535,7 +535,13 @@ Using @racket[call/cc]:
   (define (stream-generate s)
     (values
      (λ () (not (stream-empty? s)))
-     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+     (λ ()
+       (if (stream-empty? s)
+           (raise (exn:fail:contract
+                   "stream has no more values"
+                   (current-continuation-marks)))
+           (begin0 (stream-first s)
+             (set! s (stream-rest s)))))))
   (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
@@ -582,7 +588,13 @@ Using @racket[cc]:
   (define (stream-generate s)
     (values
      (λ () (not (stream-empty? s)))
-     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+     (λ ()
+       (if (stream-empty? s)
+           (raise (exn:fail:contract
+                   "stream has no more values"
+                   (current-continuation-marks)))
+           (begin0 (stream-first s)
+             (set! s (stream-rest s)))))))
   (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
@@ -630,7 +642,13 @@ Using @racket[label] and @racket[goto]:
   (define (stream-generate s)
     (values
      (λ () (not (stream-empty? s)))
-     (λ () (begin0 (stream-first s) (set! s (stream-rest s))))))
+     (λ ()
+       (if (stream-empty? s)
+           (raise (exn:fail:contract
+                   "stream has no more values"
+                   (current-continuation-marks)))
+           (begin0 (stream-first s)
+             (set! s (stream-rest s)))))))
   (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
