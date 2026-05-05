@@ -432,9 +432,9 @@ Using @racket[label] and @racket[goto]:
 @subsection{Light-Weight Processes}
 
 A simple cooperative multitasking scheduler. Multiple "threads" yield
-control with pause and are round-robin scheduled through a queue.
-
-Using @racket[call/cc]:
+control with @racket[pause] and are round-robin scheduled through a
+queue. The only part that varies across styles is the definition of
+@racket[pause]; the rest of the scheduler is shared:
 
 @racketblock[
 (let ([lwp-queue (make-queue)])
@@ -443,11 +443,7 @@ Using @racket[call/cc]:
   (define (start)
     (when (non-empty-queue? lwp-queue)
       ((dequeue! lwp-queue))))
-  (define (pause)
-    (call/cc
-     (λ (k)
-       (enqueue! lwp-queue (λ () (k #f)))
-       (start))))
+  (define (pause) ....)
 
   (lwp (λ () (let f () (pause) (display #\h) (f))))
   (lwp (λ () (let f () (pause) (display #\e) (f))))
@@ -455,54 +451,38 @@ Using @racket[call/cc]:
   (lwp (λ () (let f () (pause) (display #\!) (f))))
   (lwp (λ () (let f () (pause) (newline)     (f))))
   (start))
+]
+
+Using @racket[call/cc]:
+
+@racketblock[
+(define (pause)
+  (call/cc
+   (λ (k)
+     (enqueue! lwp-queue k)
+     (start))))
 ]
 
 Using @racket[cc]:
 
 @racketblock[
-(let ([lwp-queue (make-queue)])
-  (define (lwp thk)
-    (enqueue! lwp-queue thk))
-  (define (start)
-    (when (non-empty-queue? lwp-queue)
-      ((dequeue! lwp-queue))))
-  (define (pause)
-    (define k (cc))
-    (when k
-      (enqueue! lwp-queue (λ () (cc k #f)))
-      (start)))
-
-  (lwp (λ () (let f () (pause) (display #\h) (f))))
-  (lwp (λ () (let f () (pause) (display #\e) (f))))
-  (lwp (λ () (let f () (pause) (display #\y) (f))))
-  (lwp (λ () (let f () (pause) (display #\!) (f))))
-  (lwp (λ () (let f () (pause) (newline)     (f))))
-  (start))
+(define (pause)
+  (define k (cc))
+  (when k
+    (enqueue! lwp-queue (λ () (cc k #f)))
+    (start)))
 ]
 
 Using @racket[label] and @racket[goto]:
 
 @racketblock[
-(let ([lwp-queue (make-queue)])
-  (define (lwp thk)
-    (enqueue! lwp-queue thk))
-  (define (start)
-    (when (non-empty-queue? lwp-queue)
-      ((dequeue! lwp-queue))))
-  (define (pause)
-    (define first? #t)
-    (define l (label))
-    (when first?
-      (set! first? #f)
-      (enqueue! lwp-queue (λ () (goto l)))
-      (start)))
-
-  (lwp (λ () (let f () (pause) (display #\h) (f))))
-  (lwp (λ () (let f () (pause) (display #\e) (f))))
-  (lwp (λ () (let f () (pause) (display #\y) (f))))
-  (lwp (λ () (let f () (pause) (display #\!) (f))))
-  (lwp (λ () (let f () (pause) (newline)     (f))))
-  (start))
+(define (pause)
+  (define first? #t)
+  (define l (label))
+  (when first?
+    (set! first? #f)
+    (enqueue! lwp-queue (λ () (goto l)))
+    (start)))
 ]
 
 @subsection{Ambiguous Operator}
@@ -511,7 +491,10 @@ McCarthy's amb operator for nondeterministic programming via
 backtracking. The operator explores alternatives and backtracks
 on failure.
 
-Using @racket[call/cc]:
+The only definitions that change between the three styles are
+@racket[run] and @racket[make-amb-node]. Everything else—the
+frontier management, stream plumbing, and the word-chain
+puzzle—is identical:
 
 @racketblock[
 (let ([pop! dequeue!]
@@ -520,12 +503,8 @@ Using @racket[call/cc]:
       [empty? queue-empty?]
       [empty-handler (λ () (error "Amb tree exhausted"))]
       [amb-frontier (make-queue)])
-  (define (run amb-node) (amb-node))
-  (define (make-amb-node)
-    (call/cc
-     (λ (amb-node)
-       (push-new! amb-frontier amb-node)
-       (next))))
+  (define (run amb-node) ....)
+  (define (make-amb-node) ....)
   (define (next)
     (if (empty? amb-frontier)
         (empty-handler)
@@ -562,113 +541,40 @@ Using @racket[call/cc]:
     (unless (joins? w-2 w-3) (amb))
     (unless (joins? w-3 w-4) (amb))
     (list w-1 w-2 w-3 w-4)))
+]
+
+Using @racket[call/cc]:
+
+@racketblock[
+(define (run amb-node) (amb-node))
+(define (make-amb-node)
+  (call/cc
+   (λ (amb-node)
+     (push-new! amb-frontier amb-node)
+     (next))))
 ]
 
 Using @racket[cc]:
 
 @racketblock[
-(let ([pop! dequeue!]
-      [push-new! enqueue-front!]
-      [push-old! enqueue-front!]
-      [empty? queue-empty?]
-      [empty-handler (λ () (error "Amb tree exhausted"))]
-      [amb-frontier (make-queue)])
-  (define (run amb-node) (cc amb-node #f))
-  (define (make-amb-node)
-    (let ([amb-node (cc)])
-      (when amb-node
-        (push-new! amb-frontier amb-node)
-        (next))))
-  (define (next)
-    (if (empty? amb-frontier)
-        (empty-handler)
-        (let ([amb-node (pop! amb-frontier)])
-          (push-old! amb-frontier amb-node)
-          (run amb-node))))
-  (define (stream-generate s)
-    (values
-     (λ () (not (stream-empty? s)))
-     (λ ()
-       (if (stream-empty? s)
-           (raise (exn:fail:contract
-                   "stream has no more values"
-                   (current-continuation-marks)))
-           (begin0 (stream-first s)
-             (set! s (stream-rest s)))))))
-  (define (stream->amb s)
-    (define-values (more? get) (sequence-generate s))
-    (make-amb-node)
-    (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
-
-  (let ([w-1 (amb "the" "that" "a")]
-        [w-2 (amb "frog" "elephant" "thing")]
-        [w-3 (amb "walked" "treaded" "grows")]
-        [w-4 (amb "slowly" "quickly")])
-    (define (joins? left right)
-      (equal?
-       (string-ref left (sub1 (string-length left)))
-       (string-ref right 0)))
-    (unless (joins? w-1 w-2) (amb))
-    (unless (joins? w-2 w-3) (amb))
-    (unless (joins? w-3 w-4) (amb))
-    (list w-1 w-2 w-3 w-4)))
+(define (run amb-node) (cc amb-node #f))
+(define (make-amb-node)
+  (let ([amb-node (cc)])
+    (when amb-node
+      (push-new! amb-frontier amb-node)
+      (next))))
 ]
 
 Using @racket[label] and @racket[goto]:
 
 @racketblock[
-(let ([pop! dequeue!]
-      [push-new! enqueue-front!]
-      [push-old! enqueue-front!]
-      [empty? queue-empty?]
-      [empty-handler (λ () (error "Amb tree exhausted"))]
-      [amb-frontier (make-queue)])
-  (define (run amb-node) (goto amb-node))
-  (define (make-amb-node)
-    (let* ([first? #t] [amb-node (label)])
-      (when first?
-        (set! first? #f)
-        (push-new! amb-frontier amb-node)
-        (next))))
-  (define (next)
-    (if (empty? amb-frontier)
-        (empty-handler)
-        (let ([amb-node (pop! amb-frontier)])
-          (push-old! amb-frontier amb-node)
-          (run amb-node))))
-  (define (stream-generate s)
-    (values
-     (λ () (not (stream-empty? s)))
-     (λ ()
-       (if (stream-empty? s)
-           (raise (exn:fail:contract
-                   "stream has no more values"
-                   (current-continuation-marks)))
-           (begin0 (stream-first s)
-             (set! s (stream-rest s)))))))
-  (define (stream->amb s)
-    (define-values (more? get) (sequence-generate s))
-    (make-amb-node)
-    (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
-
-  (let ([w-1 (amb "the" "that" "a")]
-        [w-2 (amb "frog" "elephant" "thing")]
-        [w-3 (amb "walked" "treaded" "grows")]
-        [w-4 (amb "slowly" "quickly")])
-    (define (joins? left right)
-      (equal?
-       (string-ref left (sub1 (string-length left)))
-       (string-ref right 0)))
-    (unless (joins? w-1 w-2) (amb))
-    (unless (joins? w-2 w-3) (amb))
-    (unless (joins? w-3 w-4) (amb))
-    (list w-1 w-2 w-3 w-4)))
+(define (run amb-node) (goto amb-node))
+(define (make-amb-node)
+  (let* ([first? #t] [amb-node (label)])
+    (when first?
+      (set! first? #f)
+      (push-new! amb-frontier amb-node)
+      (next))))
 ]
 
 All three produce @racket['("that" "thing" "grows" "slowly")].
