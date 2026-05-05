@@ -299,7 +299,7 @@ The purely functional @tech{Double Negation Introduction} (DNI).
 
 Takes any number of values and returns a @tech{context-frozen thunk}
 of type @racket[(¬ (¬ a))] that, when invoked with a continuation
-@racket[k],simply delivers those values to @racket[k]. No continuation
+@racket[k], simply delivers those values to @racket[k]. No continuation
 is captured; no evaluation context is frozen.
 
 @racketblock[
