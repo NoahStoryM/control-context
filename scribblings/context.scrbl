@@ -497,6 +497,17 @@ frontier management, stream plumbing, and the word-chain
 puzzle—is identical:
 
 @racketblock[
+(define (stream-generate s)
+  (values
+   (λ () (not (stream-empty? s)))
+   (λ ()
+     (if (stream-empty? s)
+         (raise (exn:fail:contract
+                 "stream has no more values"
+                 (current-continuation-marks)))
+         (begin0 (stream-first s)
+           (set! s (stream-rest s)))))))
+
 (let ([pop! dequeue!]
       [push-new! enqueue-front!]
       [push-old! enqueue-front!]
@@ -511,16 +522,6 @@ puzzle—is identical:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define (stream-generate s)
-    (values
-     (λ () (not (stream-empty? s)))
-     (λ ()
-       (if (stream-empty? s)
-           (raise (exn:fail:contract
-                   "stream has no more values"
-                   (current-continuation-marks)))
-           (begin0 (stream-first s)
-             (set! s (stream-rest s)))))))
   (define (stream->amb s)
     (define-values (more? get) (sequence-generate s))
     (make-amb-node)
