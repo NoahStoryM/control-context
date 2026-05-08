@@ -497,17 +497,6 @@ frontier management, stream plumbing, and the word-chain
 puzzle—is identical:
 
 @racketblock[
-(define (stream-generate s)
-  (values
-   (λ () (not (stream-empty? s)))
-   (λ ()
-     (if (stream-empty? s)
-         (raise (exn:fail:contract
-                 "stream has no more values"
-                 (current-continuation-marks)))
-         (begin0 (stream-first s)
-           (set! s (stream-rest s)))))))
-
 (let ([pop! dequeue!]
       [push-new! enqueue-front!]
       [push-old! enqueue-front!]
@@ -522,13 +511,13 @@ puzzle—is identical:
         (let ([amb-node (pop! amb-frontier)])
           (push-old! amb-frontier amb-node)
           (run amb-node))))
-  (define (stream->amb s)
-    (define-values (more? get) (sequence-generate s))
+  (define (make-amb more? get)
     (make-amb-node)
     (if (more?) (get) (begin (pop! amb-frontier) (next))))
-  (define-syntax-rule (amb e* ...) (stream->amb (stream e* ...)))
-  (define-syntax-rule (for/amb  c b* ...) (stream->amb (for/stream  c b* ...)))
-  (define-syntax-rule (for*/amb c b* ...) (stream->amb (for*/stream c b* ...)))
+  (define sequence->amb (compose make-amb sequence-generate))
+  (define-syntax-rule (amb e* ...) (sequence->amb (stream e* ...)))
+  (define-syntax-rule (for/amb  c b* ...) (sequence->amb (for/stream  c b* ...)))
+  (define-syntax-rule (for*/amb c b* ...) (sequence->amb (for*/stream c b* ...)))
 
   (let ([w-1 (amb "the" "that" "a")]
         [w-2 (amb "frog" "elephant" "thing")]
