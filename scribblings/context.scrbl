@@ -492,7 +492,7 @@ backtracking. The operator explores alternatives and backtracks
 on failure.
 
 The only definitions that change between the three styles are
-@racket[run] and @racket[make-amb-node]. Everything else—the
+@racket[run] and @racket[make-amb-tree]. Everything else—the
 frontier management, stream plumbing, and the word-chain
 puzzle—is identical:
 
@@ -503,17 +503,17 @@ puzzle—is identical:
       [empty? queue-empty?]
       [empty-handler (λ () (error "Amb tree exhausted"))]
       [amb-frontier (make-queue)])
-  (define (run amb-node) ....)
-  (define (make-amb-node) ....)
-  (define (next)
+  (define (run amb-tree) ....)
+  (define (make-amb-tree) ....)
+  (define (search)
     (if (empty? amb-frontier)
         (empty-handler)
-        (let ([amb-node (pop! amb-frontier)])
-          (push-old! amb-frontier amb-node)
-          (run amb-node))))
+        (let ([amb-tree (pop! amb-frontier)])
+          (push-old! amb-frontier amb-tree)
+          (run amb-tree))))
   (define (make-amb more? get)
-    (make-amb-node)
-    (if (more?) (get) (begin (pop! amb-frontier) (next))))
+    (make-amb-tree)
+    (if (more?) (get) (begin (pop! amb-frontier) (search))))
   (define sequence->amb (compose make-amb sequence-generate))
   (define-syntax-rule (amb e* ...) (sequence->amb (stream e* ...)))
   (define-syntax-rule (for/amb  c b* ...) (sequence->amb (for/stream  c b* ...)))
@@ -536,35 +536,35 @@ puzzle—is identical:
 Using @racket[call/cc]:
 
 @racketblock[
-(define (run amb-node) (amb-node))
-(define (make-amb-node)
+(define (run amb-tree) (amb-tree))
+(define (make-amb-tree)
   (call/cc
-   (λ (amb-node)
-     (push-new! amb-frontier amb-node)
-     (next))))
+   (λ (amb-tree)
+     (push-new! amb-frontier amb-tree)
+     (search))))
 ]
 
 Using @racket[cc]:
 
 @racketblock[
-(define (run amb-node) (cc amb-node #f))
-(define (make-amb-node)
-  (let ([amb-node (cc)])
-    (when amb-node
-      (push-new! amb-frontier amb-node)
-      (next))))
+(define (run amb-tree) (cc amb-tree #f))
+(define (make-amb-tree)
+  (let ([amb-tree (cc)])
+    (when amb-tree
+      (push-new! amb-frontier amb-tree)
+      (search))))
 ]
 
 Using @racket[label] and @racket[goto]:
 
 @racketblock[
-(define (run amb-node) (goto amb-node))
-(define (make-amb-node)
-  (let* ([first? #t] [amb-node (label)])
+(define (run amb-tree) (goto amb-tree))
+(define (make-amb-tree)
+  (let* ([first? #t] [amb-tree (label)])
     (when first?
       (set! first? #f)
-      (push-new! amb-frontier amb-node)
-      (next))))
+      (push-new! amb-frontier amb-tree)
+      (search))))
 ]
 
 All three produce @racket['("that" "thing" "grows" "slowly")].
