@@ -64,15 +64,6 @@ freeze the current evaluation context and can later be triggered via
   @racket[(¬ (¬ a))], @racket[wait/fc] has type @racket[(→ (¬ (¬ a)) (¬ (¬ a)))],
   making frozen contexts directly composable.}
 
-  @item{@racket[return/cc] is @racket[wait/fc] specialized to plain
-  thunks: it ignores the future continuation and simply evaluates
-  @racket[thk] in the captured context, delivering the result
-  automatically.}
-
-  @item{@racket[return-with-values] is the trivial, purely functional
-  @deftech{Double Negation Introduction} (DNI): it wraps values of type
-  @racket[a] into a function of type @racket[(¬ (¬ a))] without
-  capturing any evaluation context. No continuations, no side effects.}
 ]
 
 @section{API Reference}
@@ -255,63 +246,6 @@ Implementation using @racket[cc]:
          (-> (-> any/c ... none/c) none/c)]{
 
 An alias for @racket[wait-for-future-continuation].
-}
-
-@defproc[(return-with-current-continuation
-          [thk (-> any)]
-          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
-         (-> (-> any/c ... none/c) none/c)]{
-
-Takes a thunk of type @racket[(→ a)] and returns
-a @deftech{context-frozen thunk}—a continuation of type @racket[(¬ (¬ a))]
-that captures the current evaluation context.
-
-@racket[return/cc] is @racket[wait/fc] specialized to the case where
-the body is a plain thunk @racket[thk]. The future continuation is
-ignored. For cases where the body needs access to the future
-continuation—for example, to compose frozen contexts—use
-@racket[wait/fc] directly.
-
-The optional @racket[prompt-tag] argument specifies which continuation
-prompt to capture up to, defaulting to
-@racket[(default-continuation-prompt-tag)].
-
-Implementation using @racket[wait/fc]:
-
-@racketblock[
-(: return/cc (∀ (a) (→* ((→ a)) (Prompt-TagTop) (¬ (¬ a)))))
-(define (return/cc thk [prompt-tag (default-continuation-prompt-tag)])
-  (wait/fc (λ (_) (thk)) prompt-tag))
-]
-}
-
-@defproc[(return/cc
-          [thk (-> any)]
-          [prompt-tag continuation-prompt-tag? (default-continuation-prompt-tag)])
-         (-> (-> any/c ... none/c) none/c)]{
-
-An alias for @racket[return-with-current-continuation].
-}
-
-@defproc[(return-with-values [v any/c] ...) (-> (-> any/c ... none/c) none/c)]{
-
-The purely functional @tech{Double Negation Introduction} (DNI).
-
-Takes any number of values and returns a @tech{context-frozen thunk}
-of type @racket[(¬ (¬ a))] that, when invoked with a continuation
-@racket[k], simply delivers those values to @racket[k]. No continuation
-is captured; no evaluation context is frozen.
-
-@racketblock[
-(: return-with-values (∀ (a) (→ a (¬ (¬ a)))))
-(define (return-with-values . v*) (λ (k) (apply k v*)))
-]
-
-This is the logical fact that from @racket[a] we can always derive
-@racket[(¬ (¬ a))]: given a value, we can always construct a
-@tech{context-frozen thunk} that produces it, trivially, with no
-context to freeze. Compare with @racket[wait/fc] and @racket[return/cc],
-which do capture an evaluation context.
 }
 
 @subsection{Typed Racket Definitions}
@@ -658,9 +592,7 @@ computations that run in the evaluation context where they were
 @emph{defined}, not where they are @emph{called}. This freezes
 exception handlers, @racket[dynamic-wind] guards, @racket[parameterize]
 bindings, and other context-sensitive state, while ordinary mutable
-variables remain live. @racket[return/cc] is the specialization of
-@racket[wait/fc] to plain thunks. @racket[return-with-values] is the
-degenerate case where no context is frozen at all.
+variables remain live.
 
 @subsubsection{Freezing @racket[parameterize] Bindings}
 
@@ -685,14 +617,7 @@ to @racket[proc], which decides what value to return:
 ]
 
 Contrast with a plain thunk, which would yield @racket[444] in the last
-case because @racket[(a)] would be @racket[2]. Also contrast with
-@racket[return-with-values], which captures no context at all:
-
-@racketblock[
-(define g (return-with-values 42))
-(parameterize ([a 99]) (displayln (call/cc g)))
-(code:comment "=> 42  (no context frozen — the value was fixed at construction)")
-]
+case because @racket[(a)] would be @racket[2].
 
 @subsubsection{Freezing Exception Handlers}
 

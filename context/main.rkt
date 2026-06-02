@@ -23,13 +23,6 @@
            (¬ (→ ⊥)))
        (→* ((→ (→ a c ... c ⊥) (Values b c ... c)))
            (Prompt-TagTop)
-           (¬ (→ (∪ a b) c ... c ⊥)))))]
-  [return-with-current-continuation
-   (∀ (a ...)
-      (→* ((→ (Values a ... a)))
-          (Prompt-TagTop)
-          (¬ (→ a ... a ⊥))))]
-  [return-with-values (∀ (a) (→ a (¬ (¬ a))))])
+           (¬ (→ (∪ a b) c ... c ⊥)))))])
 (provide (rename-out [current-continuation cc]
-                     [wait-for-future-continuation wait/fc]
-                     [return-with-current-continuation return/cc]))
+                     [wait-for-future-continuation wait/fc]))

@@ -132,30 +132,30 @@
   (check-eqv? result 3))
 
 ;; ============================================================
-;; return-with-current-continuation / return/cc
+;; wait-for-future-continuation / wait/fc
 ;; ============================================================
 
-;; basic: return/cc produces a callable frozen thunk
+;; basic: wait/fc produces a callable frozen thunk
 (test-begin
-  (define f (return/cc (λ () 42)))
+  (define f (wait/fc (λ (_) 42)))
   (check-pred procedure? f)
   (check-eqv? (call/cc f) 42))
 
-;; return/cc — variable environment remains live
+;; wait/fc — variable environment remains live
 (test-begin
   (define b 100)
-  (define f (return/cc (λ () (* 2 b))))
+  (define f (wait/fc (λ (_) (* 2 b))))
   (check-eqv? (call/cc f) 200)
   (set! b 300)
   (check-eqv? (call/cc f) 600))
 
-;; return/cc — parameterize bindings are frozen
+;; wait/fc — parameterize bindings are frozen
 (test-begin
   (define a (make-parameter 1))
   (define b 10)
   (define f
     (parameterize ([a 5])
-      (return/cc (λ () (* (a) b)))))
+      (wait/fc (λ (_) (* (a) b)))))
   ;; birth context has a=5
   (check-eqv? (call/cc f) 50)
   (set! b 20)
@@ -164,14 +164,14 @@
   (parameterize ([a 999])
     (check-eqv? (call/cc f) 100)))
 
-;; return/cc — dynamic-wind guards are re-entered
+;; wait/fc — dynamic-wind guards are re-entered
 (test-begin
   (define log '())
   (define f
     (dynamic-wind
       (λ () (set! log (cons 'in log)))
-      (λ () (return/cc
-             (λ () (set! log (cons 'body log)) 99)))
+      (λ () (wait/fc
+             (λ (_) (set! log (cons 'body log)) 99)))
       (λ () (set! log (cons 'out log)))))
   ;; after definition: entered and exited the dynamic-wind once
   (check-equal? log '(out in))
@@ -181,35 +181,40 @@
   (check-eqv? result 99)
   (check-equal? log '(out body in)))
 
-;; return/cc — captured resources
+;; wait/fc — captured resources
 (test-begin
   (define f
     (let ([p (open-input-string "hello")])
-      (return/cc (λ () (read-line p)))))
+      (wait/fc (λ (_) (read-line p)))))
   (check-equal? (call/cc f) "hello"))
 
-;; return/cc — multiple values
+;; wait/fc — multiple values
 (test-begin
   (define f
-    (return/cc (λ () (values 1 2 3))))
+    (wait/fc (λ (_) (values 1 2 3))))
   (define-values (a b c) (call/cc f))
   (check-eqv? a 1)
   (check-eqv? b 2)
   (check-eqv? c 3))
 
-;; return/cc — with explicit prompt tag
+;; wait/fc — with explicit prompt tag
 (test-begin
-  (define tag (make-continuation-prompt-tag 'ret))
+  (define tag (make-continuation-prompt-tag 'wait))
   (define f
     (call-with-continuation-prompt
      (λ ()
-       (return/cc (λ () 77) tag))
+       (wait/fc (λ (_) 77) tag))
      tag))
   (define result
     (call-with-continuation-prompt
      (λ () (call/cc f tag))
      tag))
   (check-eqv? result 77))
+
+;; wait/fc — future continuation is accessible
+(test-begin
+  (define f (wait/fc (λ (k) (k 99))))
+  (check-eqv? (call/cc f) 99))
 
 ;; ============================================================
 ;; Light-weight processes (integration test)
@@ -413,19 +418,19 @@
   (check-exn exn:fail:contract?
              (λ () (label 42))))
 
-;; return/cc with non-procedure should raise argument error
+;; wait/fc with non-procedure should raise argument error
 (test-begin
   (check-exn exn:fail:contract?
-             (λ () (return/cc 42))))
+             (λ () (wait/fc 42))))
 
-;; return/cc with wrong-arity procedure should raise argument error
+;; wait/fc with wrong-arity procedure should raise argument error
 (test-begin
   (check-exn exn:fail:contract?
-             (λ () (return/cc (λ (x) x)))))
+             (λ () (wait/fc (λ () 1)))))
 
-;; return/cc with non-prompt-tag second arg should raise argument error
+;; wait/fc with non-prompt-tag second arg should raise argument error
 (test-begin
   (check-exn exn:fail:contract?
-             (λ () (return/cc (λ () 1) 42))))
+             (λ () (wait/fc (λ (_) 1) 42))))
 
 (displayln 'Done)

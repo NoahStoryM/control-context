@@ -68,19 +68,19 @@
   (check-eqv? result 42))
 
 ;; ============================================================
-;; return-with-current-continuation / return/cc
+;; wait-for-future-continuation / wait/fc
 ;; ============================================================
 
 ;; basic
 (test-begin
-  (define f (return/cc (λ () 42)))
+  (define f (wait/fc (λ (_) 42)))
   (check-pred procedure? f)
   (check-eqv? (call/cc f) 42))
 
 ;; variable environment remains live
 (test-begin
   (define b 100)
-  (define f (return/cc (λ () (* 2 b))))
+  (define f (wait/fc (λ (_) (* 2 b))))
   (check-eqv? (call/cc f) 200)
   (set! b 300)
   (check-eqv? (call/cc f) 600))
@@ -91,7 +91,7 @@
   (define b 10)
   (define f
     (parameterize ([a 5])
-      (return/cc (λ () (* (a) b)))))
+      (wait/fc (λ (_) (* (a) b)))))
   (check-eqv? (call/cc f) 50)
   (set! b 20)
   (check-eqv? (call/cc f) 100)
@@ -104,8 +104,8 @@
   (define f
     (dynamic-wind
       (λ () (set! log (cons 'in log)))
-      (λ () (return/cc
-             (λ () (set! log (cons 'body log)) 99)))
+      (λ () (wait/fc
+             (λ (_) (set! log (cons 'body log)) 99)))
       (λ () (set! log (cons 'out log)))))
   (check-equal? log '(out in))
   (set! log '())
@@ -117,7 +117,7 @@
 (test-begin
   (define f
     (let ([p (open-input-string "hello")])
-      (return/cc (λ () (read-line p)))))
+      (wait/fc (λ (_) (read-line p)))))
   (check-equal? (call/cc f) "hello"))
 
 ;; ============================================================
