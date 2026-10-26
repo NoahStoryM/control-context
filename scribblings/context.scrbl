@@ -587,7 +587,7 @@ And in terms of @racket[label] and @racket[goto]:
 
 @subsection{Context-Frozen Thunks}
 
-The @racket[wait/fc] operator creates @tech{context-frozen thunks}:
+The @racket[wait/fc] operator creates @deftech{context-frozen thunks}:
 computations that run in the evaluation context where they were
 @emph{defined}, not where they are @emph{called}. This freezes
 exception handlers, @racket[dynamic-wind] guards, @racket[parameterize]
